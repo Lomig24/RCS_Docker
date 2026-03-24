@@ -1,4 +1,6 @@
-# RCS_Docker_ver1.0
+![logo](./RCS_Docker_logo.png)
+
+# Ver1.0
 
 [English Version](README.md)
 
