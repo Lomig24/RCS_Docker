@@ -1,3 +1,4 @@
+![logo](./RCS_Docker_logo.png)
 # RCS_Docker_ver1.0
 
 [中文版本](README_CN.md)
