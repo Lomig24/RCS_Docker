@@ -1,0 +1,36 @@
+{
+  "local_node_id": null,
+  "ingress_node_ids": [
+    8,
+    16,
+    21,
+    23
+  ],
+  "node_to_container": {
+    "0": "25n50e_node0",
+    "1": "25n50e_node1",
+    "2": "25n50e_node2",
+    "3": "25n50e_node3",
+    "4": "25n50e_node4",
+    "5": "25n50e_node5",
+    "6": "25n50e_node6",
+    "7": "25n50e_node7",
+    "8": "25n50e_node8",
+    "9": "25n50e_node9",
+    "10": "25n50e_node10",
+    "11": "25n50e_node11",
+    "12": "25n50e_node12",
+    "13": "25n50e_node13",
+    "14": "25n50e_node14",
+    "15": "25n50e_node15",
+    "16": "25n50e_node16",
+    "17": "25n50e_node17",
+    "18": "25n50e_node18",
+    "19": "25n50e_node19",
+    "20": "25n50e_node20",
+    "21": "25n50e_node21",
+    "22": "25n50e_node22",
+    "23": "25n50e_node23",
+    "24": "25n50e_node24"
+  }
+}
