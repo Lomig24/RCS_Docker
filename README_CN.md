@@ -1,51 +1,40 @@
 ![logo](./RCS_Docker_logo.png)
-
-# Ver1.0
+# RCS_Docker2.0
 
 [English Version](README.md)
 
-RCS_Docker_ver1.0 用 Docker 运行时节点替代 [RayCloudSim](https://github.com/ZhangRui111/RayCloudSim) 中的仿真执行层，面向 Topo4MEC 数据集的任务生成与策略评估。
+RCS_Docker2.0 聚焦真实任务处理与 3 Pi x 25 节点边缘协同评估。
 
-当前版本已具备完整的 Docker 适配评估流程，包括基于拓扑的传输估计、资源约束下的执行模拟与策略对比。真实 Docker workload 尚未全面接入，但整体框架已为后续扩展做好准备。
-
-本目录中的依赖不包含 RayCloudSim 所有核心依赖，请先完成 RayCloudSim 环境配置。
-
-## 可用启发式策略
-
-- Random
-- RoundRobin
-- GreedyLatency
+该版本提供主机调度、边缘真实容器执行、实时监控和策略对比流程。
 
 ## 功能概览
 
-- 按场景自动生成 `runtime_map` 与 `docker-compose` 文件。
-- 基于 `testset.csv` 中的 `GenerationTime` 生成任务。
-- 基于最短路径与路径瓶颈带宽估计传输时间。
-- 在 CPU/Buffer 约束下模拟执行、排队与超时失败。
-- 输出 JSON 明细与 CSV 汇总，便于复现实验与策略对比。
-
-## 支持场景
-
-- 25N50E
-- 50N50E
-- 100N150E
-- MilanCityCenter
+- 主机侧统一调度 3 个 edge agent，支持 model-based/Random/RoundRobin/GreedyLatency。
+- 边缘侧在目标容器执行真实任务，并回传执行结果与资源占用情况。
+- 支持基线对比、跨场景模型对比、RL 模型对比三类实验入口。
+- 提供实时可视化监控（CPU/内存/边缘任务计数）。
+- 输出 JSON 明细、CSV 汇总和 trace 轨迹文件。
 
 ## 项目结构
 
-- `topology.py`：拓扑加载、最短路径、带宽估计与 ingress 处理。
-- `monitor.py`：Docker 容器与主机资源状态采样。
-- `strategies.py`：启发式策略实现。
-- `generate_compose.py`：按场景生成 compose 文件与 runtime_map。
-- `experiment.py`：任务生成与任务卸载评估主程序。
-- `stack_ctl.sh`：一键执行重建/启动/实验/停止流程。
-- `requirements.txt`：本模块 Python 依赖。
+- `host_experiment.py`：主机任务调度与实验主流程。
+- `edge_agent.py`：边缘 HTTP 服务与真实任务执行。
+- `visualize_offload_live_4.py`：实时资源与任务分布可视化。
+- `run_host_exp.sh`：主机实验启动脚本。
+- `run_host_with_live.sh`：主机实验 + 实时可视化。
+- `run_edge_agent.sh`：边缘代理启动脚本。
+- `run_compare_baselines_live.sh`：model-based 对比启发式基线。
+- `run_compare_scenarios_live.sh`：model-based 跨场景模型对比。
+- `run_compare_rlmodels_live.sh`：model-based/MAML/DQN 对比。
+- `host_config_example.json`：标准配置模板。
+- `host_config_compute_heavy.json`：高负载配置模板。
+- `runtime_map_25n50e.json`：默认 runtime map 示例。
 
 ## 环境要求
 
 - Python 3.9+
 - Docker Engine 20.10+（支持 `docker compose`）
-- 已存在 RayCloudSim Topo4MEC 数据目录：
+- RayCloudSim 数据目录可用：
   - `eval/benchmarks/Topo4MEC/data/<flag>`
   - `eval/benchmarks/Topo4MEC/source/<flag>`
 
@@ -54,62 +43,73 @@ RCS_Docker_ver1.0 用 Docker 运行时节点替代 [RayCloudSim](https://github.
 在仓库根目录执行：
 
 ```bash
-cd RCS_Docker
+cd RCS_Docker2.0
 python -m pip install -r requirements.txt
 ```
 
 ## 快速开始
 
-### 方式 1：直接命令执行
+### 1) 每台边缘设备启动容器栈
 
 ```bash
-cd RCS_Docker
-python generate_compose.py --flag 50N50E
-docker compose -f docker-compose.50n50e.yml up -d
-python experiment.py --flag 50N50E --execution-mode docker --n-tasks 200
-docker compose -f docker-compose.50n50e.yml down
+cd RCS_Docker2.0
+./stack_ctl.sh regen 25N50E
+./stack_ctl.sh up 25N50E
+./stack_ctl.sh status 25N50E
 ```
 
-### 方式 2：脚本一键执行
+### 2) 每台边缘设备启动 edge agent
 
 ```bash
-cd RCS_Docker
-chmod +x stack_ctl.sh
-./stack_ctl.sh regen 50N50E
-./stack_ctl.sh up 50N50E
-./stack_ctl.sh run-exp 50N50E -- --execution-mode docker --n-tasks 200
-./stack_ctl.sh down 50N50E
+cd /path/to/repo
+PER_NODE_PARALLELISM=1 bash RCS_Docker2.0/run_edge_agent.sh pi1 18080
+PER_NODE_PARALLELISM=1 bash RCS_Docker2.0/run_edge_agent.sh pi2 18080
+PER_NODE_PARALLELISM=1 bash RCS_Docker2.0/run_edge_agent.sh pi3 18080
 ```
 
-## 常用实验参数
+可选环境变量：
+- `RUNTIME_MAP_PATH`：默认 `RCS_Docker2.0/runtime_map_25n50e.json`
+- `PER_NODE_PARALLELISM`：单节点并发任务数
 
-`experiment.py` 常用参数如下：
+### 3) 配置主机侧参数
 
-- `--flag`：场景名，可选 `25N50E`、`50N50E`、`100N150E`、`MilanCityCenter`。
-- `--execution-mode`：`simulate` 或 `docker`。
-  - `simulate`：不读取容器实时状态，使用静态满资源进行仿真。
-  - `docker`：读取容器实时资源状态进行执行评估。
-- `--n-tasks`：生成任务数，`-1` 表示使用完整测试集。
-- `--strategies`：逗号分隔策略列表，例如 `Random,RoundRobin,GreedyLatency`。
-- `--runtime-map-path`：自定义 runtime_map 路径。
-- `--output-path`：自定义 JSON 输出路径。
-- `--summary-csv-path`：自定义 CSV 汇总输出路径。
+编辑 `RCS_Docker2.0/host_config_example.json`：
 
-## 输出结果
+- 将 `edges[*].base_url` 改为真实边缘地址
+- 根据网络环境调整 `host_uplink_mbps`、`host_downlink_mbps`、`host_rtt_ms`
+- 设置 `model_path` 指向可用 checkpoint
 
-默认输出路径：
+### 4) 运行主机实验
 
-- `RCS_Docker/outputs/json/<flag>/results_v10.json`
-- `RCS_Docker/outputs/csv/<flag>/test_result_v10.csv`
+```bash
+cd /path/to/repo
+bash RCS_Docker2.0/run_host_exp.sh RCS_Docker2.0/host_config_example.json 300
+```
 
-汇总指标包括：
+默认输出：
 
-- `success_rate`
-- `avg_latency`、`p50_latency`、`p95_latency`
-- `NetCongestionError`、`InsufficientBufferError`、`TimeoutError`
+- `RCS_Docker2.0/outputs/2.0/json/results_v20.json`
+- `RCS_Docker2.0/outputs/2.0/csv/test_result_v20.csv`
+- `RCS_Docker2.0/outputs/2.0/trace/offload_trace_v20.jsonl`
 
-## 与 RayCloudSim 的关系
+### 5) 运行实时可视化
 
-- 拓扑与数据输入来自 `eval/benchmarks/Topo4MEC`。
-- 本模块聚焦 Docker 执行层替代与基础策略评估。
-- 不包含训练流程、私有策略实现与模型推理流程。
+```bash
+cd /path/to/repo
+python RCS_Docker2.0/visualize_offload_live_4.py \
+  --config RCS_Docker2.0/host_config_example.json \
+  --trace-path RCS_Docker2.0/outputs/2.0/trace/offload_trace_v20.jsonl \
+  --refresh-sec 1.0
+```
+
+## 对比实验脚本
+
+- `run_compare_baselines_live.sh`：model-based vs Random/RoundRobin/GreedyLatency
+- `run_compare_scenarios_live.sh`：model-based 跨训练场景模型
+- `run_compare_rlmodels_live.sh`：model-based vs MAML vs DQN
+
+以上脚本默认产出到 `RCS_Docker2.0/outputs/2.0/compare_runs/`。
+
+## 说明
+
+- 本版本不包含训练流程，仅用于部署与评估。

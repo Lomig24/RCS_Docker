@@ -1,3 +1,4 @@
-numpy>=1.23
-psutil>=5.9
-tqdm>=4.66
+numpy
+psutil
+torch
+matplotlib

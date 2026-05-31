@@ -1,0 +1,50 @@
+{
+  "scenario_name": "3Pi-25N50E",
+  "topo_config_path": "eval/benchmarks/Topo4MEC/data/25N50E/config.json",
+  "ingress_path": "eval/benchmarks/Topo4MEC/source/25N50E/ingress.txt",
+  "tasks_path": "eval/benchmarks/Topo4MEC/data/75N150E/testset.csv",
+  "model_path": "logs/train/MilanCityCenter/aux_sa_A0/ckps/ckp_epoch2.tar",
+  "n_tasks": 300,
+  "strategies": ["ModelBased", "Random", "RoundRobin", "GreedyLatency"],
+  "status_refresh_interval": 3,
+  "task_timeout_sec": 3.0,
+  "real_task_profile": "cpu-heavy",
+  "real_task_base_sec": 1.8,
+  "real_task_payload_scale": 1.0,
+  "real_task_max_ops": 96,
+  "real_task_ddl_factor": 1.8,
+  "real_task_ddl_min_margin": 2.5,
+  "real_task_use_dataset_ddl": false,
+  "result_payload_kb": 8.0,
+  "model_latency_penalty": 0.015,
+  "progress_interval": 10,
+  "trace_output_path": "RCS_Docker2.0/outputs/2.0/trace/offload_trace_v20.jsonl",
+  "output_json_path": "RCS_Docker2.0/outputs/2.0/json/results_v20.json",
+  "summary_csv_path": "RCS_Docker2.0/outputs/2.0/csv/test_result_v20.csv",
+  "edges": [
+    {
+      "edge_id": "pi1",
+      "base_url": "http://edge-host-1.local:18080",
+      "host_uplink_mbps": 50,
+      "host_downlink_mbps": 50,
+      "host_rtt_ms": 10,
+      "gateway_node": 0
+    },
+    {
+      "edge_id": "pi2",
+      "base_url": "http://edge-host-2.local:18080",
+      "host_uplink_mbps": 50,
+      "host_downlink_mbps": 50,
+      "host_rtt_ms": 10,
+      "gateway_node": 0
+    },
+    {
+      "edge_id": "pi3",
+      "base_url": "http://edge-host-3.local:18080",
+      "host_uplink_mbps": 50,
+      "host_downlink_mbps": 50,
+      "host_rtt_ms": 10,
+      "gateway_node": 0
+    }
+  ]
+}

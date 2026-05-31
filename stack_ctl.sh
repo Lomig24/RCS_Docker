@@ -10,11 +10,13 @@ resolve_python() {
     return 0
   fi
   command -v python3 >/dev/null 2>&1 && { echo "python3"; return 0; }
-  echo "python"
+  command -v python >/dev/null 2>&1 && { echo "python"; return 0; }
+  echo "python3"
 }
 
 PYTHON_EXE="$(resolve_python)"
-SCENARIOS=("25N50E" "50N50E" "100N150E" "MilanCityCenter")
+
+SCENARIOS=("25N50E" "50N50E" "75N150E" "100N150E" "MilanCityCenter")
 
 usage() {
   cat <<'EOF'
@@ -24,10 +26,13 @@ Usage:
   ./stack_ctl.sh down <scenario|all>      # docker compose down
   ./stack_ctl.sh status <scenario|all>    # count running prefixed containers
   ./stack_ctl.sh run-exp <scenario|all> [-- <experiment_args...>]
-  ./stack_ctl.sh all-run [-- <experiment_args...>]   # equivalent to run-exp all
+                                        # run experiment.py for one/all scenarios
+  ./stack_ctl.sh all-run [-- <experiment_args...>]
+                                        # equivalent to run-exp all
+  ./stack_ctl.sh clean-legacy             # remove old unprefixed node* containers
 
 Scenarios:
-  25N50E | 50N50E | 100N150E | MilanCityCenter | all
+  25N50E | 50N50E | 75N150E | 100N150E | MilanCityCenter | all
 EOF
 }
 
@@ -61,57 +66,12 @@ compose_file_for() {
   echo "docker-compose.${lower}.yml"
 }
 
-cleanup_conflicting_names_in_compose() {
-  local file="$1"
-  if [[ ! -f "$file" ]]; then
-    return 0
-  fi
-
-  local removed=0
-  local cname
-  while IFS= read -r cname; do
-    [[ -z "$cname" ]] && continue
-    if docker ps -aq --filter "name=^/${cname}$" | grep -q .; then
-      echo "[up] removing existing container with same name: ${cname}"
-      docker rm -f "$cname" >/dev/null
-      removed=1
-    fi
-  done < <(awk '/container_name:/ {print $2}' "$file")
-
-  return "$removed"
-}
-
-compose_up_with_retry() {
-  local file="$1"
-  local output
-  local code
-
-  set +e
-  output="$(docker compose -f "$file" up -d --remove-orphans 2>&1)"
-  code=$?
-  set -e
-
-  if [[ $code -eq 0 ]]; then
-    [[ -n "$output" ]] && echo "$output"
-    return 0
-  fi
-
-  echo "$output"
-  if echo "$output" | grep -q "is already in use by container"; then
-    echo "[up] detected container-name conflict, cleaning and retrying..."
-    cleanup_conflicting_names_in_compose "$file" || true
-    docker compose -f "$file" up -d --remove-orphans
-    return 0
-  fi
-
-  return "$code"
-}
-
 expected_count_for() {
   local flag="$1"
   case "$flag" in
     25N50E) echo 25 ;;
     50N50E) echo 50 ;;
+    75N150E) echo 75 ;;
     100N150E) echo 100 ;;
     MilanCityCenter) echo 30 ;;
     *) echo 0 ;;
@@ -139,7 +99,7 @@ cmd_up() {
     local file
     file="$(compose_file_for "$flag")"
     echo "[up] ${flag} -> ${file}"
-    compose_up_with_retry "$file"
+    docker compose -f "$file" up -d
   done < <(expand_targets "$target")
 }
 
@@ -161,6 +121,19 @@ cmd_status() {
     expected="$(expected_count_for "$flag")"
     echo "[status] ${flag}: ${actual}/${expected} running"
   done < <(expand_targets "$target")
+}
+
+cmd_clean_legacy() {
+  local names
+  names="$(docker ps -a --format '{{.Names}}' | grep -E '^node[0-9]+$' || true)"
+  if [[ -z "$names" ]]; then
+    echo "[clean-legacy] no legacy node* containers found"
+    return 0
+  fi
+  echo "[clean-legacy] removing legacy containers:"
+  echo "$names"
+  # shellcheck disable=SC2086
+  docker rm -f $names
 }
 
 cmd_run_exp() {
@@ -188,7 +161,7 @@ if [[ "$action" == "run-exp" ]]; then
     target="$1"
     shift || true
   fi
-elif [[ "$action" != "all-run" ]]; then
+elif [[ "$action" != "clean-legacy" && "$action" != "all-run" ]]; then
   target="${1:-all}"
 fi
 
@@ -196,7 +169,7 @@ if [[ "$action" == "run-exp" && $# -ge 1 && "$1" == "--" ]]; then
   shift || true
 fi
 
-if [[ "$action" != "all-run" ]]; then
+if [[ "$action" != "clean-legacy" && "$action" != "all-run" ]]; then
   if ! expand_targets "$target" >/dev/null; then
     echo "Invalid scenario: $target"
     usage
@@ -216,6 +189,9 @@ case "$action" in
     ;;
   status)
     cmd_status "$target"
+    ;;
+  clean-legacy)
+    cmd_clean_legacy
     ;;
   run-exp)
     cmd_run_exp "$target" "$@"

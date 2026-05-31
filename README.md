@@ -1,115 +1,117 @@
 ![logo](./RCS_Docker_logo.png)
-# Ver1.0
+# RCS_Docker2.0
 
 [中文版本](README_CN.md)
 
-RCS_Docker_ver1.0 replaces the simulated execution layer in [RayCloudSim](https://github.com/ZhangRui111/RayCloudSim) with Docker-based runtime nodes. It is designed for task generation and strategy evaluation on the Topo4MEC benchmark.
+RCS_Docker2.0 focuses on real task execution and distributed edge evaluation with 3 Raspberry Pi workers (25 containers per Pi).
 
-This version already includes a complete Docker-adapted evaluation workflow, including topology-aware transmission, resource-constrained execution simulation, and strategy comparison. Real Docker workloads are not yet fully integrated, but the framework is ready for future extensions.
-
-The dependencies listed in this directory do not include all core RayCloudSim requirements. Please complete the RayCloudSim environment setup first.
-
-## Available Heuristic Strategies
-
-- Random
-- RoundRobin
-- GreedyLatency
+This release keeps the host orchestrator, edge real-workload runner, live visualization, and comparison scripts.
 
 ## Feature Overview
 
-- Generate `runtime_map` and `docker-compose` files automatically for each scenario.
-- Generate tasks according to `GenerationTime` in `testset.csv`.
-- Estimate transmission time using shortest-path routing and bottleneck bandwidth.
-- Simulate execution, queueing, and timeout failures under CPU/Buffer constraints.
-- Export detailed JSON results and aggregated CSV summaries for reproducible experiments.
-
-## Supported Scenarios
-
-- 25N50E
-- 50N50E
-- 100N150E
-- MilanCityCenter
+- Distributed host scheduling across 3 edge agents.
+- Real task execution on selected Docker containers at the edge side.
+- End-to-end latency accounting including host-edge and edge-local transfer.
+- Live monitoring for CPU, memory, and per-edge task distribution.
+- JSON details, CSV summaries, and trace export for reproducible analysis.
 
 ## Project Structure
 
-- `topology.py`: Topology loading, shortest paths, bandwidth estimation, ingress handling.
-- `monitor.py`: Runtime sampling of Docker container and host resource status.
-- `strategies.py`: Heuristic strategy implementations.
-- `generate_compose.py`: Scenario-based generation of compose files and runtime maps.
-- `experiment.py`: Main entry for task generation and offloading evaluation.
-- `stack_ctl.sh`: One-command flow for regenerate/start/run/stop.
-- `requirements.txt`: Python dependencies for this Docker workflow.
+- `host_experiment.py`: Host-side orchestration and experiment pipeline.
+- `edge_agent.py`: Edge HTTP service and real task executor.
+- `visualize_offload_live_4.py`: Live visualization for resources and offload counts.
+- `run_host_exp.sh`: Host experiment launcher.
+- `run_host_with_live.sh`: Host experiment + live monitor launcher.
+- `run_edge_agent.sh`: Edge agent launcher.
+-- `run_compare_baselines_live.sh`: model-based strategy vs Random/RoundRobin/GreedyLatency.
+-- `run_compare_scenarios_live.sh`: model-based strategy across training scenarios.
+-- `run_compare_rlmodels_live.sh`: model-based strategy vs MAML vs DQN.
+- `host_config_example.json`: Standard host config template.
+- `host_config_compute_heavy.json`: Compute-heavy config template.
+- `runtime_map_25n50e.json`: Default runtime-map example.
+- `stack_ctl.sh`: Stack control helper for edge deployment.
 
 ## Prerequisites
 
 - Python 3.9+
 - Docker Engine 20.10+ (with `docker compose` support)
 - Existing RayCloudSim Topo4MEC dataset directories:
-	- `eval/benchmarks/Topo4MEC/data/<flag>`
-	- `eval/benchmarks/Topo4MEC/source/<flag>`
+  - `eval/benchmarks/Topo4MEC/data/<flag>`
+  - `eval/benchmarks/Topo4MEC/source/<flag>`
 
 ## Installation
 
 Run from repository root:
 
 ```bash
-cd RCS_Docker
+cd RCS_Docker2.0
 python -m pip install -r requirements.txt
 ```
 
 ## Quick Start
 
-### Option 1: Run Commands Directly
+### Step 1: Start 25N50E Docker stack on each edge device
 
 ```bash
-cd RCS_Docker
-python generate_compose.py --flag 50N50E
-docker compose -f docker-compose.50n50e.yml up -d
-python experiment.py --flag 50N50E --execution-mode docker --n-tasks 200
-docker compose -f docker-compose.50n50e.yml down
+cd RCS_Docker2.0
+./stack_ctl.sh regen 25N50E
+./stack_ctl.sh up 25N50E
+./stack_ctl.sh status 25N50E
 ```
 
-### Option 2: Use the Helper Script
+### Step 2: Start one edge agent per Raspberry Pi
 
 ```bash
-cd RCS_Docker
-chmod +x stack_ctl.sh
-./stack_ctl.sh regen 50N50E
-./stack_ctl.sh up 50N50E
-./stack_ctl.sh run-exp 50N50E -- --execution-mode docker --n-tasks 200
-./stack_ctl.sh down 50N50E
+cd /path/to/repo
+PER_NODE_PARALLELISM=1 bash RCS_Docker2.0/run_edge_agent.sh pi1 18080
+PER_NODE_PARALLELISM=1 bash RCS_Docker2.0/run_edge_agent.sh pi2 18080
+PER_NODE_PARALLELISM=1 bash RCS_Docker2.0/run_edge_agent.sh pi3 18080
 ```
 
-## Common Experiment Arguments
+Optional environment variables:
 
-`experiment.py` frequently used arguments:
+- `RUNTIME_MAP_PATH` (default: `RCS_Docker2.0/runtime_map_25n50e.json`)
+- `PER_NODE_PARALLELISM` (max concurrent tasks per local container)
 
-- `--flag`: Scenario name. One of `25N50E`, `50N50E`, `100N150E`, `MilanCityCenter`.
-- `--execution-mode`: `simulate` or `docker`.
-	- `simulate`: Static full-resource simulation without runtime container polling.
-	- `docker`: Uses live container resource observations.
-- `--n-tasks`: Number of generated tasks. `-1` means the full test set.
-- `--strategies`: Comma-separated strategy list, for example `Random,RoundRobin,GreedyLatency`.
-- `--runtime-map-path`: Custom runtime map path.
-- `--output-path`: Custom JSON output path.
-- `--summary-csv-path`: Custom CSV summary output path.
+### Step 3: Update host config
 
-## Outputs
+Edit `RCS_Docker2.0/host_config_example.json`:
 
-Default output paths:
+- Replace `edges[*].base_url` with your real edge agent URLs.
+- Tune `host_uplink_mbps`, `host_downlink_mbps`, `host_rtt_ms`.
+- Set `model_path` to a valid checkpoint path.
 
-- `RCS_Docker/outputs/json/<flag>/results_v10.json`
-- `RCS_Docker/outputs/csv/<flag>/test_result_v10.csv`
+### Step 4: Run host experiment
 
-Summary metrics include:
+```bash
+cd /path/to/repo
+bash RCS_Docker2.0/run_host_exp.sh RCS_Docker2.0/host_config_example.json 300
+```
 
-- `success_rate`
-- `avg_latency`, `p50_latency`, `p95_latency`
-- `NetCongestionError`, `InsufficientBufferError`, `TimeoutError`
+Default outputs:
 
-## Relationship to RayCloudSim
+- `RCS_Docker2.0/outputs/2.0/json/results_v20.json`
+- `RCS_Docker2.0/outputs/2.0/csv/test_result_v20.csv`
+- `RCS_Docker2.0/outputs/2.0/trace/offload_trace_v20.jsonl`
 
-- Topology and dataset inputs are loaded from `eval/benchmarks/Topo4MEC`.
-- This module focuses on Docker-based execution replacement and baseline strategy evaluation.
-- It does not include training pipelines, private strategy implementations, or model inference workflows.
+### Step 5: Run live visualization
 
+```bash
+cd /path/to/repo
+python RCS_Docker2.0/visualize_offload_live_4.py \
+  --config RCS_Docker2.0/host_config_example.json \
+  --trace-path RCS_Docker2.0/outputs/2.0/trace/offload_trace_v20.jsonl \
+  --refresh-sec 1.0
+```
+
+## Comparison Scripts
+
+- `run_compare_baselines_live.sh`
+- `run_compare_scenarios_live.sh`
+- `run_compare_rlmodels_live.sh`
+
+All comparison outputs are written under `RCS_Docker2.0/outputs/2.0/compare_runs/`.
+
+## Notes
+
+- This release focuses on deployment and evaluation, not model training.

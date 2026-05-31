@@ -1,0 +1,57 @@
+{
+  "scenario_name": "3Pi-25N50E-compute-heavy",
+  "topo_config_path": "eval/benchmarks/Topo4MEC/data/25N50E/config.json",
+  "ingress_path": "eval/benchmarks/Topo4MEC/source/25N50E/ingress.txt",
+  "tasks_path": "eval/benchmarks/Topo4MEC/data/75N150E/testset.csv",
+  "model_path": "logs/train/25N50E/aux_sa_A0/ckps/ckp_epoch0.tar",
+  "n_tasks": 300,
+  "strategies": ["ModelBased", "Random", "RoundRobin", "GreedyLatency"],
+  "status_refresh_interval": 75,
+  "task_timeout_sec": 20.0,
+  "edge_call_timeout_sec": 26.0,
+  "real_task_profile": "cpu-heavy",
+  "real_task_base_sec": 4.5,
+  "real_task_payload_scale": 16.0,
+  "real_task_max_ops": 2048,
+  "real_task_repeat": 8,
+  "real_task_target_sec": 5.5,
+  "real_task_ddl_factor": 2.2,
+  "real_task_ddl_min_margin": 3.0,
+  "real_task_use_dataset_ddl": true,
+  "result_payload_kb": 8.0,
+  "model_latency_penalty": 0.02,
+  "dispatch_mode": "parallel",
+  "dispatch_parallelism": 60,
+  "dispatch_per_edge": 25,
+  "dispatch_per_node": 1,
+  "progress_interval": 1,
+  "trace_output_path": "RCS_Docker2.0/outputs/2.0/trace/offload_trace_v20_compute_heavy.jsonl",
+  "output_json_path": "RCS_Docker2.0/outputs/2.0/json/results_v20_compute_heavy.json",
+  "summary_csv_path": "RCS_Docker2.0/outputs/2.0/csv/test_result_v20_compute_heavy.csv",
+  "edges": [
+    {
+      "edge_id": "pi1",
+      "base_url": "http://edge-host-1.local:18080",
+      "host_uplink_mbps": 200,
+      "host_downlink_mbps": 200,
+      "host_rtt_ms": 8,
+      "gateway_node": 0
+    },
+    {
+      "edge_id": "pi2",
+      "base_url": "http://edge-host-2.local:18080",
+      "host_uplink_mbps": 200,
+      "host_downlink_mbps": 200,
+      "host_rtt_ms": 8,
+      "gateway_node": 0
+    },
+    {
+      "edge_id": "pi3",
+      "base_url": "http://edge-host-3.local:18080",
+      "host_uplink_mbps": 200,
+      "host_downlink_mbps": 200,
+      "host_rtt_ms": 8,
+      "gateway_node": 0
+    }
+  ]
+}
